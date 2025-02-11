@@ -1,74 +1,77 @@
+const admin = require("firebase-admin");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { logger } = require("firebase-functions/logger");
-const { initializeApp } = require("firebase-admin/app");
-const { getMessaging } = require("firebase-admin/messaging");
-const { getFirestore } = require("firebase-admin/firestore");
+const { info, error } = require("firebase-functions/logger");
 
-// Initialize Firebase Admin SDK
-initializeApp();
-const db = getFirestore();
-const messaging = getMessaging();
+admin.initializeApp();
+const db = admin.firestore();
+const messaging = admin.messaging();
 
-exports.sendOrderNotification = onDocumentCreated(
-  {
-    document: "organizations/{orgId}/orders/{orderId}",
-    region: "us-central1",
-  },
+exports.send_order_notification = onDocumentCreated(
+  "organizations/{orgId}/orders/{orderId}",
   async (event) => {
     try {
-      const { orgId } = event.params;
+      info("Event data:", event);
+
+      const { orgId, orderId } = event.params;
       const snapshot = event.data;
 
-      if (!snapshot) {
-        logger.error("No data associated with the event");
+      info("Triggered function for orgId:", orgId, "orderId:", orderId);
+
+      if (!snapshot || !snapshot.exists) {
+        error("No valid snapshot received for orderId:", orderId);
         return;
       }
 
       const orderData = snapshot.data();
-      logger.log("New order data:", orderData);
+      info("New order data received:", orderData);
 
       // Validate required fields
       if (!orderData?.price || !orgId) {
-        logger.error("Missing required fields in order data");
+        error("Missing required fields in order data");
         return;
       }
 
       // Get the admin token document (fixed document ID)
       const tokenDoc = await db
-        .doc(`organizations/${orgId}/tokens/adminToken`)
+        .doc(`organizations/${orgId}/tokens/token`)
         .get();
 
       if (!tokenDoc.exists) {
-        logger.error("Admin token document not found");
+        error("Admin token document not found");
         return;
       }
 
       const adminDeviceToken = tokenDoc.data().fcmToken;
       if (!adminDeviceToken) {
-        logger.error("FCM token not found in admin document");
+        error("FCM token not found in admin document");
         return;
       }
 
       // Construct notification message
       const message = {
+        token: adminDeviceToken,
         notification: {
           title: "New Order Received!",
-          body: `Order Total: $${orderData.price}`,
+          body: `Order Total: ₹${orderData.price}`,
+          image: "https://example.com/notification-icon.png",
         },
-        token: adminDeviceToken,
         data: {
-          click_action: "http://localhost:3000/admin",
+          click_action: "www.app.smart-server.in/admin",
           order_id: event.params.orderId, // Include order ID in data
+          deep_link: "www.app.smart-server.in/admin",
         },
       };
 
       // Send FCM notification
       const response = await messaging.send(message);
 
-      logger.log("Successfully sent notification:", response);
-    } catch (error) {
-      logger.error("Error in createuser function:", error);
-      throw new Error("Failed to process order", { cause: error });
+      info("Successfully sent notification:", response);
+    } catch (err) {
+      error("Error in sendOrderNotification function:", err.message || err);
+      throw new Error("Failed to send the Notification", { cause: err });
     }
   }
 );
+
+
+
