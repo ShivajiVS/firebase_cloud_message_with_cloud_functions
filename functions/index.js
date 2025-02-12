@@ -6,16 +6,18 @@ admin.initializeApp();
 const db = admin.firestore();
 const messaging = admin.messaging();
 
+//"organizations/{orgId}/orders/{orderId}",
+
 exports.send_order_notification = onDocumentCreated(
-  "organizations/{orgId}/orders/{orderId}",
+  "history/{orderId}",
   async (event) => {
     try {
       info("Event data:", event);
 
-      const { orgId, orderId } = event.params;
+      const { orderId } = event.params;
       const snapshot = event.data;
 
-      info("Triggered function for orgId:", orgId, "orderId:", orderId);
+      info("Triggered function for orderId:", orderId);
 
       if (!snapshot || !snapshot.exists) {
         error("No valid snapshot received for orderId:", orderId);
@@ -25,11 +27,7 @@ exports.send_order_notification = onDocumentCreated(
       const orderData = snapshot.data();
       info("New order data received:", orderData);
 
-      // Validate required fields
-      if (!orderData?.price || !orgId) {
-        error("Missing required fields in order data");
-        return;
-      }
+      const orgId = orderData?.orgId;
 
       // Get the admin token document (fixed document ID)
       const tokenDoc = await db
@@ -52,13 +50,13 @@ exports.send_order_notification = onDocumentCreated(
         token: adminDeviceToken,
         notification: {
           title: "New Order Received!",
-          body: `Order Total: ₹${orderData.price}`,
-          image: "https://example.com/notification-icon.png",
+          // body: ``,
+          // image: "https://example.com/notification-icon.png",
         },
         data: {
-          click_action: "www.app.smart-server.in/admin",
-          order_id: event.params.orderId, // Include order ID in data
-          deep_link: "www.app.smart-server.in/admin",
+          click_action: "https://www.app.smart-server.in/admin",
+          order_id: event.params.orderId,
+          deep_link: "https://www.app.smart-server.in/admin",
         },
       };
 
@@ -72,6 +70,3 @@ exports.send_order_notification = onDocumentCreated(
     }
   }
 );
-
-
-
