@@ -50,13 +50,8 @@ exports.send_order_notification = onDocumentCreated(
         token: adminDeviceToken,
         notification: {
           title: "New Order Received!",
-          // body: ``,
-          // image: "https://example.com/notification-icon.png",
-        },
-        data: {
+          body: "You have a new order to process.",
           click_action: "https://www.app.smart-server.in/admin",
-          order_id: event.params.orderId,
-          deep_link: "https://www.app.smart-server.in/admin",
         },
       };
 
